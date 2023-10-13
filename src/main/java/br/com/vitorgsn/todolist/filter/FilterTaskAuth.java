@@ -25,54 +25,63 @@ public class FilterTaskAuth extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Coleta os dados de autorização criptografados enviados pelo cabeçalho da
-        // requisição http
-        var authorization = request.getHeader("Authorization");
+        // Coleta a rota da requisição
+        var servletPath = request.getServletPath();
 
-        // Remove o "Basic " (o .trim() remove o espaço) da String de autorização
-        // criptografada
-        var authEncoded = authorization.substring("Basic".length()).trim();
+        // Se a rota for de tasks, verifica se o usuário está logado
+        // Se for qualquer outra rota, segue normalmente
+        if (servletPath.startsWith("/tasks/")) {
+            // Coleta os dados de autorização criptografados enviados pelo cabeçalho da
+            // requisição http
+            var authorization = request.getHeader("Authorization");
 
-        // Faz o decode da String de autorização criptografada para um array de bytes,
-        // remove a criptografia
-        byte[] authDecode = Base64.getDecoder().decode(authEncoded);
+            // Remove o "Basic " (o .trim() remove o espaço) da String de autorização
+            // criptografada
+            var authEncoded = authorization.substring("Basic".length()).trim();
 
-        // Transforma o array de bytes não legível em uma String legível
-        var authString = new String(authDecode);
+            // Faz o decode da String de autorização criptografada para um array de bytes,
+            // remove a criptografia
+            byte[] authDecode = Base64.getDecoder().decode(authEncoded);
 
-        // Divide as credenciais username:password que estão numa string única, porém
-        // separadas por :
-        // Os resultados do split são armazenados em um array de string
-        String[] credentials = authString.split(":");
+            // Transforma o array de bytes não legível em uma String legível
+            var authString = new String(authDecode);
 
-        // Coleta as credenciais do array para strings individuais
-        String username = credentials[0];
-        String password = credentials[1];
+            // Divide as credenciais username:password que estão numa string única, porém
+            // separadas por :
+            // Os resultados do split são armazenados em um array de string
+            String[] credentials = authString.split(":");
 
-        System.out.println("Authorization");
-        System.out.println(username);
-        System.out.println(password);
+            // Coleta as credenciais do array para strings individuais
+            String username = credentials[0];
+            String password = credentials[1];
 
-        // Busca de usuário por username, passando o username da requisição
-        var user = this.userRepository.findByUsername(username);
+            // Busca de usuário por username, passando o username da requisição
+            var user = this.userRepository.findByUsername(username);
 
-        // Se não encontrar um usuário, responde 401 (sem autorização)
-        // Se não, valida a senha
-        if (user == null) {
-            response.sendError(401);
-        } else {
-            // Utiliza o verify do verifyer da biblioteca BCrypt para comparar o password da
-            // requisição com o password (CRIPTOGRAFADA) do usuário encontrado no database
-            var passwordVerify = BCrypt.verifyer().verify(password.toCharArray(), user.getPassword());
-
-            // Se as senhas forem iguais, autentica o usuário e permite que continue
-            // Se não, responde 401 (sem autorização)
-            if (passwordVerify.verified) {
-                filterChain.doFilter(request, response);
-            } else {
+            // Se não encontrar um usuário, responde 401 (sem autorização)
+            // Se não, valida a senha
+            if (user == null) {
                 response.sendError(401);
+            } else {
+                // Utiliza o verify do verifyer da biblioteca BCrypt para comparar o password da
+                // requisição com o password (CRIPTOGRAFADA) do usuário encontrado no database
+                var passwordVerify = BCrypt.verifyer().verify(password.toCharArray(), user.getPassword());
+
+                // Se as senhas forem iguais, autentica o usuário e permite que continue
+                // Se não, responde 401 (sem autorização)
+                if (passwordVerify.verified) {
+                    // Passa para o controller o id do usuário logado através de atributo da
+                    // requisição
+                    request.setAttribute("idUser", user.getId());
+                    filterChain.doFilter(request, response);
+                } else {
+                    response.sendError(401);
+                }
             }
+        } else {
+            filterChain.doFilter(request, response);
         }
+
     }
 
 }
