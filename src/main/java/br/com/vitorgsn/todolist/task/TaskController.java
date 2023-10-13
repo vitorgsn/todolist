@@ -64,11 +64,25 @@ public class TaskController {
     public ResponseEntity update(@RequestBody TaskModel taskModel, HttpServletRequest request, @PathVariable UUID id) {
 
         var oldTask = this.taskRepository.findById(id).orElse(null);
+        var idUser = request.getAttribute("idUser");
 
+        // Validar se a task a ser atualizada existe
+        if (oldTask == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Tarefa não encontrada.");
+        }
+
+        // Validar se o usuário que está tentando alterar a task é o proprietário
+        if (!oldTask.getIdUser().equals(idUser)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("O Usuário não tem permissão para alterar essa tarefa.");
+        }
+
+        // Mescla de atributos da task existente com os atributos passados na requisição
+        // Update parcial da task
         Utils.copyNonNullProperties(taskModel, oldTask);
+        var taskUpdated = this.taskRepository.save(oldTask);
 
-        this.taskRepository.save(oldTask);
-
-        return ResponseEntity.status(HttpStatus.OK).body(oldTask);
+        return ResponseEntity.status(HttpStatus.OK).body(taskUpdated);
     }
 }
