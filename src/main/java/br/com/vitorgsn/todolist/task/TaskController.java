@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -84,5 +85,28 @@ public class TaskController {
         var taskUpdated = this.taskRepository.save(oldTask);
 
         return ResponseEntity.status(HttpStatus.OK).body(taskUpdated);
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity delete(@PathVariable UUID id, HttpServletRequest request) {
+
+        var oldTask = this.taskRepository.findById(id).orElse(null);
+        var idUser = request.getAttribute("idUser");
+
+        // Validar se a task a ser deletada existe
+        if (oldTask == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("Tarefa não encontrada.");
+        }
+
+        // Validar se o usuário que está tentando deletar a task é o proprietário
+        if (!oldTask.getIdUser().equals(idUser)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("O Usuário não tem permissão para deletar essa tarefa.");
+        }
+
+        this.taskRepository.deleteById(id);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(null);
+
     }
 }
